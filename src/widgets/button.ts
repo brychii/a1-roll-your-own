@@ -1,118 +1,186 @@
-// importing local code, code we have written
-import {IdleUpWidgetState, PressedWidgetState } from "../core/ui";
-import {Window, Widget, RoleType, EventArgs} from "../core/ui";
-// importing code from SVG.js library
-import {Rect, Text, Box} from "../core/ui";
+// importing from our ui system
+import { IdleUpWidgetState, PressedWidgetState } from "../core/ui";
+import { Window, Widget, RoleType, EventArgs } from "../core/ui";
 
-class Button extends Widget{
+// svg-related
+import { Rect, Text, Box } from "../core/ui";
+
+class Button extends Widget {
     private _rect: Rect;
     private _text: Text;
     private _input: string;
     private _fontSize: number;
     private _text_y: number;
-    private _text_x: number;
-    private defaultText: string= "Button";
-    private defaultFontSize: number = 18;
-    private defaultWidth: number = 80;
-    private defaultHeight: number = 30;
 
-    constructor(parent:Window){
+    private clickCallback: (() => void) | null = null;
+
+    private defaultText: string = "Button";
+    private defaultFontSize: number = 18;
+    private defaultWidth: number = 100;
+    private defaultHeight: number = 40;
+
+    constructor(parent: Window) {
         super(parent);
+
         // set defaults
         this.height = this.defaultHeight;
         this.width = this.defaultWidth;
         this._input = this.defaultText;
         this._fontSize = this.defaultFontSize;
-        // set Aria role
+
+        // set role for accessibility
         this.role = RoleType.button;
-        // render widget
+
+        // draw the button
         this.render();
-        // set default or starting state
+
+        // starting state
         this.setState(new IdleUpWidgetState());
-        // prevent text selection
+
+        // set text highlighting when clicking to false
         this.selectable = false;
     }
 
-    set fontSize(size:number){
-        this._fontSize= size;
+    // allows changing of the text on the button
+    set label(text: string) {
+        this._input = text;
         this.update();
     }
 
-    private positionText(){
-        let box:Box = this._text.bbox();
-        // in TS, the prepending with + performs a type conversion from string to number
-        this._text_y = (+this._rect.y() + ((+this._rect.height()/2)) - (box.height/2));
-        this._text.x(+this._rect.x() + 4);
-        if (this._text_y > 0){
+    get label(): string {
+        return this._input;
+    }
+
+    // change font size if needed
+    set fontSize(size: number) {
+        this._fontSize = size;
+        this.update();
+    }
+
+    // allows resizing of the button
+    set size({ width, height }: { width: number; height: number }) {
+        this.width = width;
+        this.height = height;
+        this.update();
+    }
+
+    // allow outside code to hook into clicks
+    onClick(callback: () => void): void {
+        this.clickCallback = callback;
+    }
+
+    // centers text inside the button
+    private positionText() {
+        let box: Box = this._text.bbox();
+
+        this._text_y =
+            +this._rect.y() +
+            +this._rect.height() / 2 -
+            box.height / 2;
+
+        // center horizontally
+        this._text.x(
+            +this._rect.x() +
+            (+this._rect.width() / 2) -
+            (box.width / 2)
+        );
+
+        if (this._text_y > 0) {
             this._text.y(this._text_y);
         }
     }
-    
+
     render(): void {
         this._group = (this.parent as Window).window.group();
-        this._rect = this._group.rect(this.width, this.height);
-        this._rect.stroke("black");
-        this._text = this._group.text(this._input);
-        // Set the outer svg element 
-        this.outerSvg = this._group;
-        // Add a transparent rect on top of text to 
-        // prevent selection cursor and to handle mouse events
-        let eventrect = this._group.rect(this.width, this.height).opacity(0).attr('id', 0);
 
-        // register objects that should receive event notifications.
-        // for this widget, we want to know when the group or rect objects
-        // receive events
+        // main button shape
+        this._rect = this._group.rect(this.width, this.height);
+        this._rect.stroke({ width: 2, color: "#333" });
+        this._rect.fill("#4CAF50");
+        this._rect.radius(8);
+
+        // label text
+        this._text = this._group.text(this._input);
+        this._text.fill("#ffffff");
+
+        this.outerSvg = this._group;
+
+        // invisible layer for catching mouse events
+        let eventrect = this._group
+            .rect(this.width, this.height)
+            .opacity(0)
+            .attr("id", 0);
+
+        // tell system this should receive events
         this.registerEvent(eventrect);
     }
 
     override update(): void {
-        if(this._text != null)
-            this._text.font('size', this._fontSize);
+        if (this._text != null) {
+            this._text.font("size", this._fontSize);
             this._text.text(this._input);
             this.positionText();
+        }
 
-        if(this._rect != null)
-            this._rect.fill(this.backcolor);
-        
+        if (this._rect != null) {
+            this._rect.size(this.width, this.height);
+        }
+
         super.update();
     }
-    
-    pressReleaseState(): void{
 
-        if (this.previousState instanceof PressedWidgetState)
+    // fires when click completes
+    pressReleaseState(): void {
+        if (this.previousState instanceof PressedWidgetState) {
             this.raise(new EventArgs(this));
+
+            if (this.clickCallback) {
+                this.clickCallback();
+            }
+        }
     }
 
-    //TODO: implement the onClick event using a callback passed as a parameter
-    onClick(/*TODO: add callback parameter*/):void{}
+    // visual states
 
-    
-    //TODO: give the states something to do! Use these methods to control the visual appearance of your
-    //widget
+    // normal state
     idleupState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#4CAF50");
     }
+
+    // mouse down
     idledownState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#388E3C");
     }
+
+    // pressed
     pressedState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#2E7D32");
     }
+
+    // hover
     hoverState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#66BB6A");
     }
+
+    // hover + pressed
     hoverPressedState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#2E7D32");
     }
+
+    // dragged out while pressed
     pressedoutState(): void {
-        throw new Error("Method not implemented.");
+        this._rect.fill("#1B5E20");
     }
+
+    // not really using this
     moveState(): void {
-        throw new Error("Method not implemented.");
+        // nothing for now
     }
+
+    // not needed for this assignment
     keyupState(keyEvent?: KeyboardEvent): void {
-        throw new Error("Method not implemented.");
+        // left empty on purpose
     }
 }
 
-export {Button}
+export { Button };
